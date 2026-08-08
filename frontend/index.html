@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LifeLink AI — Emergency Intelligence Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{
+  --ink:#0B1220;
+  --ink2:#111B2C;
+  --ink3:#16233A;
+  --line:#233150;
+  --paper:#F3F5F8;
+  --paper2:#FFFFFF;
+  --paper-line:#E1E6ED;
+  --text:#0B1220;
+  --text-dim:#E9EDF3;
+  --muted:#6B7686;
+  --muted-dim-dark:#7C8AA3;
+  --teal:#00C2A8;
+  --teal-deep:#00A08A;
+  --teal-tint:#DFF7F3;
+  --red:#FF3B30;
+  --red-tint:#FFE3E1;
+  --amber:#FFB020;
+  --amber-tint:#FFF2D9;
+  --green:#16C784;
+  --green-tint:#DDF7EC;
+  --blue:#3D8BFD;
+  --font-d:'Space Grotesk', sans-serif;
+  --font-b:'Inter', sans-serif;
+  --font-m:'IBM Plex Mono', monospace;
+  --shadow:0 18px 44px -20px rgba(11,18,32,0.35);
+  --shadow-sm:0 6px 18px -10px rgba(11,18,32,0.18);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--text);font-family:var(--font-b);}
+body{height:100vh;overflow:hidden;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--paper-line);border-radius:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+a{color:inherit;}
+button{font-family:var(--font-b);cursor:pointer;}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+.app{display:flex;flex-direction:column;height:100vh;}
+
+/* ============ TOP CHROME ============ */
+.chrome{flex-shrink:0;background:var(--ink);color:var(--text-dim);}
+.topbar{display:flex;align-items:center;gap:20px;padding:12px 22px 8px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--teal),var(--teal-deep));display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-mark svg{width:19px;height:19px;}
+.brand-name{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:0.2px;line-height:1.1;}
+.brand-tag{font-family:var(--font-m);font-size:9.5px;color:var(--muted-dim-dark);letter-spacing:0.6px;margin-top:1px;}
+
+.role-nav{display:flex;gap:3px;flex:1;flex-wrap:wrap;align-items:center;}
+.nav-divider{width:1px;height:20px;background:var(--line);margin:0 6px;}
+.role-tabs{display:flex;gap:4px;}
+.role-tab{display:flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;font-size:12.5px;font-weight:500;color:var(--muted-dim-dark);border:1px solid transparent;white-space:nowrap;transition:.15s;background:transparent;cursor:pointer;}
+.role-tab:hover{background:var(--ink2);color:var(--text-dim);}
+.role-tab.active{background:var(--ink3);color:var(--text-dim);border-color:var(--line);}
+.role-tab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted-dim-dark);}
+.role-tab.active .dot{background:var(--teal);box-shadow:0 0 0 3px rgba(0,194,168,0.18);}
+
+.topbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:20px;font-family:var(--font-m);font-size:10.5px;background:var(--ink2);border:1px solid var(--line);color:var(--muted-dim-dark);}
+.chip .lv{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.6s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--text-dim);padding:7px 13px;border-radius:8px;font-size:12px;font-weight:500;}
+.btn-ghost:hover{background:var(--ink2);}
+.btn-teal{background:var(--teal);border:1px solid var(--teal);color:#03211D;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;}
+.btn-teal:hover{background:var(--teal-deep);border-color:var(--teal-deep);color:#fff;}
+
+/* ---- vital line: the signature element. A live ECG waveform that
+   reflects the current case's severity — calm sine when idle, sharp
+   erratic spikes climbing toward red as severity rises. ---- */
+.vitalline-wrap{position:relative;height:46px;border-top:1px solid var(--line);overflow:hidden;}
+.vitalline-wrap svg{position:absolute;inset:0;width:100%;height:100%;}
+.vl-meta{position:absolute;left:22px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px;font-family:var(--font-m);font-size:10.5px;color:var(--muted-dim-dark);z-index:2;background:linear-gradient(90deg, var(--ink) 55%, transparent);padding-right:30px;}
+.vl-meta b{font-size:15px;color:var(--text-dim);font-family:var(--font-d);}
+.vl-status{padding:2px 9px;border-radius:20px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;}
+.vl-status.idle{background:var(--ink3);color:var(--muted-dim-dark);}
+.vl-status.moderate{background:rgba(255,176,32,0.16);color:var(--amber);}
+.vl-status.high{background:rgba(255,176,32,0.2);color:var(--amber);}
+.vl-status.critical{background:rgba(255,59,48,0.18);color:var(--red);}
+.vl-right{position:absolute;right:22px;top:50%;transform:translateY(-50%);font-family:var(--font-m);font-size:10.5px;color:var(--muted-dim-dark);z-index:2;background:linear-gradient(270deg, var(--ink) 55%, transparent);padding-left:30px;}
+.vl-right b{color:var(--text-dim);}
+
+/* ============ CASE BANNER ============ */
+.case-banner{display:none;align-items:center;gap:10px;padding:9px 22px;background:var(--paper2);border-bottom:1px solid var(--paper-line);flex-wrap:wrap;}
+.case-banner.show{display:flex;}
+.cb-chip{font-size:12px;font-weight:600;padding:4px 11px;border-radius:20px;background:var(--paper);border:1px solid var(--paper-line);color:var(--text);}
+.cb-chip.lead{background:var(--ink);color:#fff;border-color:var(--ink);}
+.cb-spacer{flex:1;}
+.cb-id{font-family:var(--font-m);font-size:11px;color:var(--muted);}
+.cb-clock{font-family:var(--font-m);font-size:12px;color:var(--muted);}
+
+/* ============ STEPPER ============ */
+.stepper-strip{display:none;padding:10px 22px 12px;background:var(--paper2);border-bottom:1px solid var(--paper-line);}
+.stepper-strip.show{display:block;}
+.stepper{display:flex;gap:0;}
+.step{flex:1;display:flex;align-items:center;gap:8px;position:relative;padding-right:8px;}
+.step:not(:last-child)::after{content:'';position:absolute;right:0;top:11px;width:100%;height:2px;background:var(--paper-line);}
+.step-dot{width:22px;height:22px;border-radius:50%;background:var(--paper);border:2px solid var(--paper-line);display:flex;align-items:center;justify-content:center;font-family:var(--font-m);font-size:10px;color:var(--muted);flex-shrink:0;z-index:1;transition:.2s;}
+.step-lbl{font-size:11.5px;color:var(--muted);font-weight:600;z-index:1;}
+.step.done .step-dot{background:var(--teal);border-color:var(--teal);color:#fff;}
+.step.done::after{background:var(--teal);}
+.step.done .step-lbl{color:var(--text);}
+.step.active .step-dot{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 0 0 4px rgba(11,18,32,0.1);}
+.step.active .step-lbl{color:var(--text);font-weight:700;}
+
+/* ============ MAIN ============ */
+.main{flex:1;overflow-y:auto;padding:28px 30px 60px;}
+.screen{display:none;max-width:1180px;margin:0 auto;}
+.screen.active{display:block;animation:rise .35s ease;}
+@keyframes rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.eyebrow{font-family:var(--font-m);font-size:11px;color:var(--teal-deep);letter-spacing:1px;text-transform:uppercase;font-weight:600;margin-bottom:10px;}
+.screen-title{font-family:var(--font-d);font-size:34px;font-weight:700;margin:0 0 8px;letter-spacing:-0.3px;}
+.screen-sub{font-size:14.5px;color:var(--muted);margin:0 0 26px;max-width:640px;line-height:1.5;}
+
+.panel{background:var(--paper2);border:1px solid var(--paper-line);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow-sm);}
+.panel-head{font-family:var(--font-m);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;font-weight:600;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--paper-line);}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.grid-3{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:18px;}
+
+/* ---- SOS home ---- */
+.hero-row{display:flex;gap:34px;align-items:center;margin-bottom:34px;flex-wrap:wrap;}
+.sos-dial{width:190px;height:190px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #FF6259, var(--red) 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;cursor:pointer;border:none;box-shadow:0 0 0 8px rgba(255,59,48,0.10), 0 20px 50px -18px rgba(255,59,48,0.55);flex-shrink:0;position:relative;transition:transform .15s;}
+.sos-dial:hover{transform:scale(1.03);}
+.sos-dial::before{content:'';position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(255,59,48,0.35);animation:sospulse 2.2s infinite;}
+@keyframes sospulse{0%{transform:scale(0.94);opacity:.9;}70%{transform:scale(1.18);opacity:0;}100%{opacity:0;}}
+.sos-word{font-family:var(--font-d);font-size:30px;font-weight:700;letter-spacing:1px;}
+.sos-sub{font-family:var(--font-m);font-size:10px;letter-spacing:1.4px;margin-top:4px;opacity:.9;}
+.hero-copy{max-width:380px;}
+.hero-copy h2{font-family:var(--font-d);font-size:20px;margin:0 0 8px;}
+.hero-copy p{font-size:13.5px;color:var(--muted);line-height:1.55;margin:0;}
+
+.who-row{display:flex;gap:10px;align-items:center;margin:18px 0 4px;flex-wrap:wrap;}
+.who-lbl{font-size:12px;color:var(--muted);font-weight:600;}
+select.who-select{padding:6px 12px;border-radius:20px;border:1px solid var(--paper-line);background:var(--paper2);font-size:12.5px;font-weight:600;color:var(--text);font-family:var(--font-b);}
+
+.type-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:30px;}
+.type-card{background:var(--paper2);border:1px solid var(--paper-line);border-radius:12px;padding:16px 8px;text-align:center;cursor:pointer;transition:.15s;}
+.type-card:hover{border-color:var(--teal);transform:translateY(-2px);box-shadow:var(--shadow-sm);}
+.type-card.selected{border-color:var(--teal);background:var(--teal-tint);}
+.type-card .icon{font-size:22px;margin-bottom:6px;}
+.type-card .label{font-size:11px;font-weight:600;color:var(--text);}
+
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.stat{background:var(--paper2);border:1px solid var(--paper-line);border-radius:12px;padding:16px 18px;}
+.stat .val{font-family:var(--font-d);font-size:24px;font-weight:700;}
+.stat .lbl{font-size:11.5px;color:var(--muted);margin-top:2px;}
+
+/* ---- voice / transcript ---- */
+.transcript{min-height:170px;max-height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.bubble{max-width:82%;padding:9px 13px;border-radius:12px;font-size:13px;line-height:1.4;}
+.bubble.ai{align-self:flex-start;background:var(--paper);border:1px solid var(--paper-line);border-bottom-left-radius:3px;}
+.bubble.user{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:3px;}
+.voice-controls{display:flex;gap:8px;}
+.btn{padding:9px 15px;border-radius:9px;border:1px solid var(--paper-line);background:var(--paper2);font-size:12.5px;font-weight:600;color:var(--text);}
+.btn:hover{border-color:var(--teal);}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+.btn.primary:hover{background:var(--ink2);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+a.btn{display:inline-block;text-decoration:none;}
+.no-typing{font-family:var(--font-m);font-size:10.5px;color:var(--teal-deep);margin-top:10px;}
+.proto-note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.4;}
+
+.upload-zone{border:1.5px dashed var(--paper-line);border-radius:12px;padding:26px;text-align:center;cursor:pointer;color:var(--muted);transition:.15s;}
+.upload-zone:hover{border-color:var(--teal);color:var(--teal-deep);}
+.upload-zone svg{width:26px;height:26px;margin-bottom:8px;}
+.hint{font-size:12.5px;}
+.tag-list{margin-top:14px;display:flex;flex-direction:column;gap:7px;}
+.tag-row{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 10px;background:var(--paper);border-radius:8px;}
+.tag-row .name{color:var(--muted);}
+.tag-row .val{font-weight:700;}
+
+.severity-panel{margin-top:20px;background:var(--ink);border-radius:14px;padding:20px 22px;color:#fff;}
+.severity-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.severity-head .t{font-size:13px;font-weight:600;color:var(--muted-dim-dark);}
+.severity-head .pct{font-family:var(--font-d);font-size:30px;font-weight:700;}
+.severity-bar-track{height:8px;border-radius:6px;background:var(--ink3);overflow:hidden;}
+.severity-bar-fill{height:100%;background:linear-gradient(90deg,var(--amber),var(--red));border-radius:6px;transition:width .5s;width:0%;}
+.severity-verdict{margin-top:10px;font-size:13px;font-weight:600;color:var(--red);}
+
+/* ---- assessment ---- */
+.mini-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--paper-line);font-size:13px;}
+.mini-row:last-child{border-bottom:none;}
+.mini-row .k{color:var(--muted);}
+.mini-row .v{font-weight:700;}
+.warn-v{color:var(--amber) !important;}
+
+.ai-card{background:var(--ink);color:#fff;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;}
+.ai-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.ai-card-head .t{font-family:var(--font-d);font-size:15px;font-weight:700;}
+.ai-conf-row{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;}
+.ai-conf{font-family:var(--font-d);font-size:32px;font-weight:700;color:var(--teal);}
+.ai-conf-lbl{font-size:12px;color:var(--muted-dim-dark);}
+.ai-conf-lbl b{color:var(--red);}
+.ai-reasons{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.ai-reason{font-size:12.5px;display:flex;gap:8px;color:var(--text-dim);}
+.ai-reason .check{color:var(--teal);font-weight:700;}
+.ai-model-row{margin-top:auto;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--font-m);font-size:10.5px;color:var(--muted-dim-dark);}
+.ai-dots span{animation:dotfade 1.2s infinite;opacity:.3;}
+.ai-dots span:nth-child(2){animation-delay:.2s;}
+.ai-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dotfade{0%,100%{opacity:.2;}50%{opacity:1;}}
+
+.action-callout{background:var(--red-tint);color:#A32B21;font-weight:700;font-size:13px;padding:11px 14px;border-radius:9px;margin-bottom:12px;}
+.action-item{display:flex;align-items:center;gap:9px;font-size:13px;padding:8px 0;border-bottom:1px solid var(--paper-line);}
+.action-item:last-child{border-bottom:none;}
+.action-item .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;}
+
+/* ---- hospital ---- */
+.flight-row{display:flex;gap:16px;margin-bottom:20px;align-items:stretch;flex-wrap:wrap;}
+.flight-card{flex:1.4;min-width:280px;background:var(--paper2);border:1px solid var(--paper-line);border-radius:14px;padding:20px 22px;}
+.flight-card.winner{border:2px solid var(--teal);box-shadow:var(--shadow-sm);position:relative;}
+.flight-card.winner::before{content:'AI RECOMMENDED';position:absolute;top:-11px;left:20px;background:var(--teal);color:#03211D;font-family:var(--font-m);font-size:9.5px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:6px;}
+.fc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.fc-name{font-family:var(--font-d);font-size:19px;font-weight:700;}
+.fc-tag{font-size:11.5px;color:var(--muted);margin-top:3px;}
+.fc-score-block{text-align:right;flex-shrink:0;}
+.fc-score{font-family:var(--font-d);font-size:26px;font-weight:700;color:var(--teal-deep);}
+.fc-score.mid{color:var(--amber);}
+.fc-score.lo{color:var(--muted);}
+.fc-score-lbl{font-size:10px;color:var(--muted);}
+.fc-eta{font-size:13px;margin-bottom:12px;color:var(--muted);}
+.fc-eta b{color:var(--text);}
+.fc-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-bottom:12px;padding:10px 0;border-top:1px dashed var(--paper-line);border-bottom:1px dashed var(--paper-line);}
+.fc-stats .fs-row{display:flex;justify-content:space-between;font-size:12px;}
+.fc-stats .fs-row .fs-k{color:var(--muted);}
+.fc-stats .fs-row .fs-v{font-weight:700;}
+.fc-survival{display:flex;align-items:center;justify-content:space-between;background:var(--teal-tint);border-radius:9px;padding:8px 12px;margin-bottom:12px;}
+.fc-survival .fsv-lbl{font-size:11.5px;color:#03332B;font-weight:600;}
+.fc-survival .fsv-val{font-family:var(--font-d);font-size:20px;font-weight:700;color:#03705F;}
+.fc-why-head{font-family:var(--font-m);font-size:10px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;letter-spacing:0.5px;}
+.fc-why-item{font-size:12.5px;display:flex;gap:7px;margin-bottom:6px;}
+.fc-why-item .ck{color:var(--teal-deep);font-weight:700;}
+.fc-why-item.neg .ck{color:var(--red);}
+.flight-card.minor{flex:0.75;min-width:150px;display:flex;flex-direction:column;justify-content:space-between;}
+.fc-minor-name{font-family:var(--font-d);font-weight:700;font-size:15px;text-align:center;}
+.fc-minor-reason{font-size:11.5px;color:var(--red);text-align:center;margin-top:8px;}
+.dispatch-row{display:flex;justify-content:flex-end;margin-top:6px;}
+
+.nearest-compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.nc-side{background:var(--paper);border-radius:10px;padding:14px 16px;}
+.nc-lbl{font-family:var(--font-m);font-size:9.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:4px;}
+.nc-name{font-family:var(--font-d);font-weight:700;font-size:15px;margin-bottom:8px;}
+.nc-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--muted);}
+.nc-row b{color:var(--text);}
+.nc-tag{font-size:11.5px;margin-top:6px;}
+.nc-tag.pos{color:var(--teal-deep);}
+.nc-tag.neg{color:var(--red);}
+
+/* ---- ambulance / map ---- */
+#map{height:280px;border-radius:14px;border:1px solid var(--paper-line);margin-bottom:18px;}
+.sim-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-m);font-size:10.5px;color:var(--muted);background:var(--paper2);border:1px solid var(--paper-line);padding:5px 11px;border-radius:20px;margin-bottom:10px;}
+.checkpoints{display:flex;flex-direction:column;gap:0;margin-bottom:18px;}
+.cp{display:flex;align-items:center;gap:12px;padding:9px 0;position:relative;}
+.cp .cdot{width:11px;height:11px;border-radius:50%;background:var(--paper-line);flex-shrink:0;}
+.cp.done .cdot{background:var(--teal);}
+.cp.active .cdot{background:var(--ink);box-shadow:0 0 0 4px rgba(11,18,32,0.12);}
+.cp .clbl{flex:1;font-size:13px;font-weight:600;color:var(--muted);}
+.cp.done .clbl,.cp.active .clbl{color:var(--text);}
+.cp .ctime{font-family:var(--font-m);font-size:11.5px;color:var(--muted);}
+.live-widget-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.live-widget{background:var(--paper2);border:1px solid var(--paper-line);border-radius:12px;padding:13px;text-align:center;}
+.live-widget .icon{font-size:16px;margin-bottom:4px;}
+.live-widget .val{font-family:var(--font-d);font-size:16px;font-weight:700;}
+.live-widget .lbl{font-size:10.5px;color:var(--muted);margin-top:2px;}
+
+/* ---- doctor console (dark) ---- */
+.console{background:var(--ink);border-radius:18px;padding:26px 28px;color:var(--text-dim);}
+.console .eyebrow{color:var(--teal);}
+.console .screen-sub{color:var(--muted-dim-dark);}
+.console .panel{background:var(--ink2);border-color:var(--line);}
+.console .panel-head{color:var(--muted-dim-dark);border-color:var(--line);}
+.patient-card{display:flex;gap:22px;flex-wrap:wrap;}
+.avatar-block{width:130px;text-align:center;flex-shrink:0;}
+.avatar-circle{width:64px;height:64px;border-radius:50%;background:var(--teal);color:#03211D;font-family:var(--font-d);font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
+.level-badge{display:inline-block;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.3px;}
+.level-badge.critical{background:rgba(255,59,48,0.18);color:#FF8079;}
+.level-badge.high{background:rgba(255,176,32,0.18);color:var(--amber);}
+.level-badge.moderate{background:rgba(61,139,253,0.18);color:var(--blue);}
+.vitals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;flex:1;min-width:260px;}
+.vital .l{font-size:10.5px;color:var(--muted-dim-dark);text-transform:uppercase;letter-spacing:0.4px;}
+.vital .v{font-family:var(--font-d);font-size:16px;font-weight:700;margin-top:2px;}
+.checklist{display:flex;flex-direction:column;gap:9px;}
+.check-item{display:flex;align-items:center;gap:9px;font-size:13px;}
+.check-item .box{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--teal);flex-shrink:0;position:relative;}
+.check-item .box::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--teal);}
+.doctor-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.dcard{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:15px 17px;}
+.dcard .name{font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.sev{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;}
+.sev.high{background:rgba(255,176,32,0.18);color:var(--amber);}
+.sev.critical{background:rgba(255,59,48,0.18);color:#FF8079;}
+.sev.moderate{background:rgba(61,139,253,0.18);color:var(--blue);}
+.dcard .row{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--muted-dim-dark);}
+.dcard .row b{color:var(--text-dim);}
+
+/* ---- family ---- */
+.family-hero{text-align:center;padding:20px 0 26px;}
+.family-heart{font-size:38px;margin-bottom:10px;}
+.family-title{font-family:var(--font-d);font-size:26px;font-weight:700;margin:0;color:#0B6B45;}
+.family-panel{border-radius:20px;background:linear-gradient(180deg,#FBFEFC,#FFFFFF);}
+.timeline{display:flex;flex-direction:column;}
+.t-item{display:flex;gap:14px;position:relative;padding-bottom:22px;}
+.t-item:last-child{padding-bottom:0;}
+.t-item .node{width:12px;height:12px;border-radius:50%;background:var(--teal);margin-top:3px;flex-shrink:0;}
+.t-item.pending .node{background:var(--paper-line);}
+.t-item .tline{position:absolute;left:5px;top:15px;bottom:0;width:2px;background:var(--paper-line);}
+.t-item .tbody b{font-size:14px;}
+.t-item .tsub{font-size:12px;color:var(--muted);margin-top:2px;}
+.reassure{margin-top:18px;background:var(--teal-tint);border-radius:12px;padding:16px 18px;font-size:13.5px;line-height:1.55;color:#03332B;}
+.reassure b{font-weight:700;}
+
+/* ---- analytics ---- */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.kpi{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+.kpi .val{font-family:var(--font-d);font-size:24px;font-weight:700;}
+.kpi .lbl{font-size:10.5px;color:var(--muted-dim-dark);text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;}
+.heatmap{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;}
+.heat-cell{aspect-ratio:1;border-radius:3px;}
+.icu-row{display:flex;gap:14px;flex-wrap:wrap;}
+.icu-cell{flex:1;min-width:110px;background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center;}
+.icu-cell .city{font-size:11px;color:var(--muted-dim-dark);margin-bottom:8px;}
+.icu-ring-num{font-family:var(--font-m);font-size:18px;font-weight:700;}
+.chart-wrap{position:relative;height:170px;}
+
+.cases-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px;}
+.cases-table th{text-align:left;font-family:var(--font-m);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted-dim-dark);padding:8px 10px;border-bottom:1px solid var(--line);}
+.cases-table td{padding:10px 10px;border-bottom:1px solid var(--line);color:var(--text-dim);}
+.cases-table tr:last-child td{border-bottom:none;}
+.ct-risk{padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;}
+.ct-risk.critical{background:rgba(255,59,48,0.18);color:#FF8079;}
+.ct-risk.high{background:rgba(255,176,32,0.18);color:var(--amber);}
+.ct-risk.moderate{background:rgba(61,139,253,0.18);color:var(--blue);}
+.ct-risk.low{background:rgba(22,199,132,0.18);color:var(--green);}
+.ct-risk.pending{background:var(--ink3);color:var(--muted-dim-dark);}
+
+/* ---- report screen: simple, SOS-first ---- */
+.report-hero{text-align:center;padding:8px 0 30px;}
+.report-brand{font-family:var(--font-d);font-size:15px;font-weight:700;letter-spacing:3px;color:var(--teal-deep);}
+.report-tag{font-size:13px;color:var(--muted);margin-top:4px;}
+.report-pitch{max-width:560px;margin:18px auto 0;font-family:var(--font-d);font-size:17px;line-height:1.5;color:var(--text);font-style:italic;}
+
+/* ---- command center (operator screen) ---- */
+.command-wrap{position:relative;border-radius:20px;padding:26px 26px 22px;margin-bottom:28px;overflow:hidden;background:radial-gradient(120% 160% at 15% 0%, #132A4A 0%, #0B1220 55%), radial-gradient(90% 140% at 100% 0%, rgba(0,194,168,0.18) 0%, transparent 60%);color:#fff;}
+.command-wrap::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 85% 15%, rgba(0,194,168,0.25), transparent 45%), radial-gradient(circle at 10% 90%, rgba(255,59,48,0.14), transparent 40%);pointer-events:none;}
+.command-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;position:relative;z-index:1;}
+.command-head .t{font-family:var(--font-m);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted-dim-dark);}
+.command-live{display:flex;align-items:center;gap:6px;font-family:var(--font-m);font-size:10.5px;color:var(--green);}
+.live-case-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;position:relative;z-index:1;}
+.glass-card{background:rgba(255,255,255,0.055);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,0.09);border-radius:14px;padding:16px 18px;border-left:3px solid var(--muted-dim-dark);}
+.glass-card.critical{border-left-color:var(--red);}
+.glass-card.high{border-left-color:var(--amber);}
+.glass-card.stable{border-left-color:var(--green);}
+.glass-card .gc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.glass-card .gc-dot{width:8px;height:8px;border-radius:50%;}
+.glass-card.critical .gc-dot{background:var(--red);box-shadow:0 0 0 4px rgba(255,59,48,0.18);animation:blink 1.3s infinite;}
+.glass-card.high .gc-dot{background:var(--amber);box-shadow:0 0 0 4px rgba(255,176,32,0.16);}
+.glass-card.stable .gc-dot{background:var(--green);box-shadow:0 0 0 4px rgba(22,199,132,0.16);}
+.glass-card .gc-val{font-family:var(--font-d);font-size:30px;font-weight:700;}
+.glass-card .gc-lbl{font-size:11.5px;color:var(--muted-dim-dark);margin-top:2px;}
+.mini-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;position:relative;z-index:1;}
+.mini-kpi{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:13px 16px;display:flex;align-items:center;gap:12px;}
+.mini-kpi .ico{font-size:18px;}
+.mini-kpi .mv{font-family:var(--font-d);font-size:17px;font-weight:700;}
+.mini-kpi .ml{font-size:10.5px;color:var(--muted-dim-dark);}
+
+/* ---- floating dock: timeline + copilot ---- */
+.fab-dock{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:10px;z-index:60;}
+.fab{width:52px;height:52px;border-radius:50%;background:var(--ink);border:1px solid var(--line);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);position:relative;}
+.fab:hover{background:var(--ink2);}
+.fab.teal{background:var(--teal);color:#03211D;border-color:var(--teal);}
+.fab .fab-badge{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--red);border:2px solid var(--paper);}
+
+.drawer{position:fixed;top:0;right:-420px;width:400px;max-width:92vw;height:100vh;background:var(--paper2);border-left:1px solid var(--paper-line);box-shadow:-18px 0 44px -20px rgba(11,18,32,0.35);z-index:70;transition:right .28s ease;display:flex;flex-direction:column;}
+.drawer.open{right:0;}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--paper-line);flex-shrink:0;}
+.drawer-head .t{font-family:var(--font-d);font-size:16px;font-weight:700;}
+.drawer-close{width:28px;height:28px;border-radius:8px;border:1px solid var(--paper-line);background:var(--paper2);font-size:14px;}
+.drawer-body{flex:1;overflow-y:auto;padding:16px 18px;}
+
+/* ---- copilot chat ---- */
+.chat-log{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+.chat-msg{font-size:13px;line-height:1.5;padding:10px 13px;border-radius:12px;max-width:92%;}
+.chat-msg.user{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:3px;}
+.chat-msg.ai{align-self:flex-start;background:var(--paper);border:1px solid var(--paper-line);border-bottom-left-radius:3px;}
+.chat-msg.ai b{display:block;font-family:var(--font-m);font-size:9.5px;color:var(--teal-deep);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.chat-input-row{display:flex;gap:8px;padding:12px 0 0;border-top:1px solid var(--paper-line);}
+.chat-input-row input{flex:1;padding:9px 12px;border-radius:9px;border:1px solid var(--paper-line);font-size:13px;font-family:var(--font-b);}
+.chat-quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.chat-quick button{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--paper-line);background:var(--paper);color:var(--muted);}
+
+/* ---- vision overlay ---- */
+.vision-photo{position:relative;border-radius:12px;overflow:hidden;height:150px;margin-bottom:12px;background:linear-gradient(135deg,#1c2942,#0B1220);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:var(--muted-dim-dark);font-family:var(--font-m);font-size:11px;}
+.vision-photo.has-img{color:transparent;}
+.vision-photo.has-img span{background:rgba(11,18,32,0.7);color:var(--text-dim);padding:3px 9px;border-radius:20px;position:absolute;bottom:8px;left:8px;font-size:10.5px;}
+.vision-photo .scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--teal),transparent);animation:scan 1.8s linear infinite;}
+@keyframes scan{0%{top:0;}100%{top:100%;}}
+.vision-photo .vtag{position:absolute;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(0,194,168,0.85);color:#03211D;white-space:nowrap;}
+.vision-conf-badge{position:absolute;top:8px;right:8px;background:rgba(11,18,32,0.75);color:var(--teal);font-family:var(--font-m);font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid rgba(0,194,168,0.4);}
+
+/* ---- predictive alert ---- */
+.predictive-card{border-radius:14px;padding:16px 18px;margin-top:16px;display:flex;gap:14px;align-items:flex-start;}
+.predictive-card.at-risk{background:var(--red-tint);border:1px solid #FFBDB6;}
+.predictive-card.clear{background:var(--green-tint);border:1px solid #A9EDCF;}
+.predictive-card .pic{font-size:22px;}
+.predictive-card .pt{font-weight:700;font-size:13.5px;margin-bottom:3px;}
+.predictive-card.at-risk .pt{color:#A32B21;}
+.predictive-card.clear .pt{color:#0B6B45;}
+.predictive-card .ps{font-size:12.5px;color:var(--text);}
+
+/* ---- risk distribution bar ---- */
+.risk-dist-bar{display:flex;height:14px;border-radius:8px;overflow:hidden;margin-bottom:10px;}
+.risk-dist-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted-dim-dark);}
+.risk-dist-legend span{display:inline-flex;align-items:center;gap:5px;}
+.risk-dist-legend .sw{width:8px;height:8px;border-radius:2px;}
+
+/* ---- report / checklist card (family) ---- */
+.status-checklist{display:flex;flex-direction:column;gap:9px;margin-bottom:16px;}
+.status-checklist .sc-item{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 12px;background:var(--paper);border-radius:9px;}
+.status-checklist .sc-item .k{display:flex;align-items:center;gap:8px;color:var(--muted);}
+.status-checklist .sc-item .k .chk{color:var(--teal-deep);font-weight:700;}
+.status-checklist .sc-item .v{font-weight:700;}
+
+.path-strip{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12.5px;font-weight:600;color:var(--muted);flex-wrap:wrap;}
+.path-strip .seg{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:var(--paper2);border:1px solid var(--paper-line);}
+.path-strip .arrow{color:var(--paper-line);}
+
+/* ---- connection banner + toasts ---- */
+.conn-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#3A0F0C;color:#FFD9D5;padding:9px 22px;font-size:12.5px;border-top:1px solid #5A1C17;}
+.conn-banner button{padding:4px 11px;font-size:11.5px;}
+.chip.offline .lv{background:var(--red) !important;animation:none !important;}
+.chip.connecting .lv{background:var(--amber) !important;}
+
+.toast-stack{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center;}
+.toast{background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:var(--shadow);border:1px solid var(--line);display:flex;align-items:center;gap:8px;animation:toastin .2s ease;}
+.toast.warn{background:#3A2A0C;border-color:#5A4317;color:#FFE7B8;}
+.toast.error{background:#3A0F0C;border-color:#5A1C17;color:#FFD9D5;}
+@keyframes toastin{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+
+@media (max-width:1050px){
+  .live-case-grid,.mini-kpi-row{grid-template-columns:1fr;}
+  .grid-2,.grid-3,.type-grid,.stat-row,.live-widget-row,.doctor-card-grid,.kpi-row{grid-template-columns:1fr 1fr;}
+  .type-grid{grid-template-columns:repeat(4,1fr);}
+  .live-widget-row{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width:680px){
+  .grid-2,.grid-3,.stat-row,.doctor-card-grid,.kpi-row{grid-template-columns:1fr;}
+  .type-grid{grid-template-columns:repeat(4,1fr);}
+  .hero-row{flex-direction:column;align-items:flex-start;}
+  .flight-row{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+<div class="toast-stack" id="toastStack"></div>
+<div class="app">
+
+  <div class="chrome">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h3l2-7 4 14 2-7h5" stroke="#03211D" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="brand-name">LifeLink AI</div>
+      </div>
+
+      <nav class="role-nav" id="nav">
+        <div class="role-tab" data-screen="dashboard"><span class="dot"></span>Report</div>
+        <div class="role-tab" data-screen="emergency"><span class="dot"></span>Assessment</div>
+        <div class="role-tab" data-screen="assessment"><span class="dot"></span>Triage</div>
+        <div class="role-tab" data-screen="hospital"><span class="dot"></span>Match</div>
+        <div class="role-tab" data-screen="ambulance"><span class="dot"></span>Track</div>
+        <div class="nav-divider"></div>
+        <div class="role-tab" data-screen="doctor"><span class="dot"></span>Trauma Team</div>
+        <div class="role-tab" data-screen="family"><span class="dot"></span>Family</div>
+        <div class="nav-divider"></div>
+        <div class="role-tab" data-screen="command"><span class="dot"></span>Command</div>
+        <div class="role-tab" data-screen="analytics"><span class="dot"></span>Analytics</div>
+      </nav>
+
+      <div class="topbar-actions">
+        <div class="chip" id="connChip"><span class="lv"></span> <span id="connChipText">Connecting…</span></div>
+        <button class="btn-teal" id="resetDemo">New Case</button>
+      </div>
+    </div>
+
+    <div class="conn-banner" id="connBanner" style="display:none;">
+      <span>⚠ Can't reach the LifeLink AI server — the backend isn't running (or isn't reachable at this address).</span>
+      <span id="connBannerHelp"></span>
+      <button class="btn-ghost" id="connRetryBtn">Retry</button>
+    </div>
+
+    <div class="vitalline-wrap">
+      <svg id="vlSvg" viewBox="0 0 1000 46" preserveAspectRatio="none"><path id="vlPath" d="" stroke="#00C2A8" stroke-width="2" fill="none"/></svg>
+      <div class="vl-meta"><span class="vl-status idle" id="vlStatus">STANDBY</span> <b id="vlScore">--</b><span>severity</span></div>
+      <div class="vl-right">Golden Hour <b id="ghMini">60:00</b></div>
+    </div>
+  </div>
+
+  <div class="fab-dock">
+    <button class="fab" id="timelineFab" title="Case timeline">🕒</button>
+    <button class="fab teal" id="copilotFab" title="AI Copilot">💬<span class="fab-badge" id="copilotBadge" style="display:none;"></span></button>
+  </div>
+
+  <div class="drawer" id="timelineDrawer">
+    <div class="drawer-head"><div class="t">🕒 Live Case Timeline</div><button class="drawer-close" data-close="timelineDrawer">✕</button></div>
+    <div class="drawer-body"><div class="timeline" id="drawerTimeline"></div></div>
+  </div>
+
+  <div class="drawer" id="copilotDrawer">
+    <div class="drawer-head"><div class="t">💬 AI Copilot</div><button class="drawer-close" data-close="copilotDrawer">✕</button></div>
+    <div class="drawer-body">
+      <div class="chat-quick" id="chatQuickCase">
+        <button data-q="Why was this hospital selected?">Why this hospital?</button>
+        <button data-q="Why is the patient critical?">Why critical?</button>
+        <button data-q="What did vision assessment detect?">Vision findings?</button>
+        <button data-q="What is the current ETA?">Current ETA?</button>
+        <button data-q="What should the doctor prepare?">Doctor prep?</button>
+      </div>
+      <div class="chat-quick">
+        <button data-q="Patient is unconscious and not breathing">Unconscious patient</button>
+        <button data-q="Severe chest pain radiating to arm">Chest pain</button>
+        <button data-q="Heavy bleeding from the leg">Heavy bleeding</button>
+      </div>
+      <div class="chat-log" id="chatLog">
+        <div class="chat-msg ai"><b>AI Copilot</b>Ask about this case ("Why this hospital?") or describe a symptom for possible causes.</div>
+      </div>
+    </div>
+    <div style="padding:0 18px 16px;">
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Ask about this case…">
+        <button class="btn primary" id="chatSend">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="case-banner" id="caseBanner">
+    <div class="cb-chip lead" id="cbLead">Case</div>
+    <div class="cb-chip" id="cbPatient">—</div>
+    <div class="cb-chip" id="cbRisk">—</div>
+    <div class="cb-spacer"></div>
+    <div class="cb-id" id="cbId">—</div>
+    <div class="cb-clock" id="clock">--:--:--</div>
+  </div>
+
+  <div class="stepper-strip" id="stepperStrip">
+    <div class="stepper" id="stepper">
+      <div class="step" data-min="0"><div class="step-dot">1</div><div class="step-lbl">Report</div></div>
+      <div class="step" data-min="1"><div class="step-dot">2</div><div class="step-lbl">Assess</div></div>
+      <div class="step" data-min="2"><div class="step-dot">3</div><div class="step-lbl">Match</div></div>
+      <div class="step" data-min="3"><div class="step-dot">4</div><div class="step-lbl">Dispatch</div></div>
+      <div class="step" data-min="4"><div class="step-dot">5</div><div class="step-lbl">Treat</div></div>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+
+    <!-- SCREEN 1: HOME / REPORT -->
+    <section class="screen" id="screen-dashboard">
+      <div class="report-hero">
+        <div class="report-brand">LIFELINK AI</div>
+        <div class="report-tag">Emergency Response System</div>
+        <p class="report-pitch">"LifeLink AI doesn't simply find the nearest hospital — it finds the hospital most capable of saving the patient's golden hour."</p>
+      </div>
+
+      <div class="hero-row">
+        <button class="sos-dial" id="triggerBtn">
+          <div class="sos-word">SOS</div>
+          <div class="sos-sub">TAP FOR HELP</div>
+        </button>
+        <div class="hero-copy">
+          <h2>Report an emergency</h2>
+          <p>Pick what's happening below. LifeLink opens a case, links it to a patient record if one exists, and starts routing help immediately.</p>
+          <div class="who-row">
+            <span class="who-lbl">Reporting for</span>
+            <select class="who-select" id="whoSelect">
+              <option value="">🆕 New / unknown patient</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="type-grid" id="typeGrid"></div>
+    </section>
+
+    <!-- SCREEN 2: EMERGENCY / ASSESS -->
+    <section class="screen" id="screen-emergency">
+      <div class="eyebrow">Guided Assessment · Step 2</div>
+      <h1 class="screen-title" id="emTitle">Tell us what's happening</h1>
+      <p class="screen-sub">A short structured Q&A captures symptoms, and a scene photo feeds the vision prototype — both run in parallel, before triage.</p>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">🎤 Guided Assessment — symptom questions</div>
+          <div class="transcript" id="transcript"></div>
+          <div class="voice-controls">
+            <button class="btn primary" id="voiceNext">▶ Next question</button>
+            <button class="btn" id="voiceAll">▶ Run all questions</button>
+          </div>
+          <div class="no-typing">◆ Structured Q&A — a voice interface would sit in front of this same flow</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">📷 Vision Assessment — Prototype</div>
+          <div class="upload-zone" id="uploadZone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+            <div class="hint" id="uploadHint">Click to choose a scene photo from your device</div>
+          </div>
+          <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
+          <div class="vision-photo" id="visionPhoto" style="display:none;">
+            <span id="visionPhotoName">scene_04.jpg</span>
+            <div class="scan-line"></div>
+            <div class="vision-conf-badge" id="visionConfBadge">93%</div>
+          </div>
+          <div class="tag-list" id="scanResult" style="display:none;"></div>
+          <div class="proto-note">⚠ Prototype — findings below are simulated from the reported emergency type, not detected from pixels in this image.</div>
+        </div>
+      </div>
+
+      <div class="severity-panel">
+        <div class="severity-head">
+          <div class="t">Emergency Severity Gauge</div>
+          <div class="pct" id="sevPct">—</div>
+        </div>
+        <div class="severity-bar-track"><div class="severity-bar-fill" id="sevFill"></div></div>
+        <div class="severity-verdict" id="sevVerdict">Run voice + photo to compute severity</div>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: ASSESSMENT / TRIAGE -->
+    <section class="screen" id="screen-assessment">
+      <div class="eyebrow">AI Triage · Step 3</div>
+      <h1 class="screen-title" id="assessTitle">AI Triage</h1>
+      <p class="screen-sub">Symptoms, vision findings, and patient history merged into one Severity Score — with the reasons shown, not just the number.</p>
+
+      <div class="grid-3" id="assessGrid">
+        <div class="panel">
+          <div class="panel-head">Patient Summary</div>
+          <div id="patientSummary"></div>
+        </div>
+
+        <div class="ai-card">
+          <div class="ai-card-head"><div class="t" id="triageCardTitle">AI Decision Engine</div></div>
+          <div class="ai-conf-row">
+            <div class="ai-conf" id="triageConf">—</div>
+            <div class="ai-conf-lbl">Severity Score · Risk <b id="triageRisk">—</b></div>
+          </div>
+          <div class="ai-reasons" id="triageReasons"></div>
+          <div class="ai-model-row">
+            <span>Model: <b id="triageModel">—</b></span>
+            <span class="ai-dots"><span>.</span><span>.</span><span>.</span> live</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">Recommended Actions</div>
+          <div id="recommendedActions"></div>
+        </div>
+      </div>
+
+      <div class="predictive-card clear" id="predictiveCard" style="display:none;">
+        <div class="pic">🔮</div>
+        <div><div class="pt" id="predictiveTitle">AI Prediction</div><div class="ps" id="predictiveSub">—</div></div>
+      </div>
+
+      <div class="dispatch-row">
+        <a class="btn" id="downloadReportBtn" href="#" target="_blank">⬇ Download AI Report (PDF)</a>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: HOSPITAL / MATCH -->
+    <section class="screen" id="screen-hospital">
+      <div class="eyebrow">HospitalMatchAgent + GoldenHourAgent · Step 4</div>
+      <h1 class="screen-title">The right hospital, not just the nearest one</h1>
+      <p class="screen-sub">Every hospital is scored on readiness — ICU beds, specialists, equipment, current workload — then the Golden Hour Decision Engine picks whoever has the highest Golden-Hour Suitability Score.</p>
+
+      <div class="flight-row" id="flightRow"></div>
+
+      <div class="ai-card" id="hospAiCard" style="margin-bottom:16px;">
+        <div class="ai-card-head">
+          <div class="t">Golden Hour Decision Engine</div>
+          <div class="ai-conf-row" style="margin-bottom:0;"><div class="ai-conf" id="hospConf">—</div><div class="ai-conf-lbl">Golden-Hour Suitability Score</div></div>
+        </div>
+        <div class="ai-reasons" id="hospReasons"></div>
+        <div style="font-size:12.5px;color:var(--muted-dim-dark);margin-top:10px;padding-top:10px;border-top:1px solid var(--line);" id="ghExplanation"></div>
+        <div class="ai-model-row"><span>Model: <b>Golden Hour Decision Engine v1</b></span><span class="ai-dots"><span>.</span><span>.</span><span>.</span> live</span></div>
+      </div>
+
+      <div class="panel" id="nearestCompareWrap" style="margin-bottom:16px;">
+        <div class="panel-head">Why not the nearest hospital?</div>
+        <div class="nearest-compare" id="nearestCompare"></div>
+      </div>
+
+      <div class="dispatch-row">
+        <button class="btn primary" id="dispatchBtn">Dispatch ambulance to top match →</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 5: AMBULANCE / TRACK -->
+    <section class="screen" id="screen-ambulance">
+      <div class="eyebrow">DispatchAgent · Step 5</div>
+      <h1 class="screen-title">🚑 Ambulance En Route</h1>
+      <p class="screen-sub">Real map, real haversine distance math, real hospital and ambulance coordinates. Position along the route is calculated from elapsed time, not a live GPS feed — labeled below accordingly.</p>
+
+      <div class="path-strip" id="pathStrip">
+        <div class="seg">📍 Patient</div><span class="arrow">→</span>
+        <div class="seg">🚑 Ambulance</div><span class="arrow">→</span>
+        <div class="seg">🏥 Hospital</div><span class="arrow">→</span>
+        <div class="seg" id="pathEta">⏱ ETA —</div>
+      </div>
+
+      <div class="sim-badge">📡 Live Route Simulation — not a connected GPS feed</div>
+      <div id="map"></div>
+      <div class="checkpoints" id="checkpoints"></div>
+      <div class="live-widget-row" id="liveWidgets"></div>
+    </section>
+
+    <!-- SCREEN 6: DOCTOR CONSOLE -->
+    <section class="screen" id="screen-doctor">
+      <div class="console">
+        <div class="eyebrow">Trauma team console</div>
+        <h1 class="screen-title">Pre-Arrival Medical Handoff</h1>
+        <p class="screen-sub">The receiving doctor gets this before the ambulance doors open — not after.</p>
+
+        <div class="panel" id="handoffPanel"></div>
+
+        <div class="panel" style="margin-top:16px;" id="mainPatientPanel"></div>
+
+        <div class="predictive-card clear" id="doctorPredictiveCard" style="display:none;"></div>
+
+        <div style="margin-top:18px;" class="doctor-card-grid" id="otherCasesGrid"></div>
+      </div>
+    </section>
+
+    <!-- SCREEN 7: FAMILY -->
+    <section class="screen" id="screen-family">
+      <div class="family-hero">
+        <div class="family-heart">❤️</div>
+        <h1 class="family-title">We're taking care of them</h1>
+      </div>
+
+      <div class="panel family-panel" style="max-width:560px;">
+        <div class="status-checklist" id="statusChecklist"></div>
+        <div class="timeline" id="familyTimeline"></div>
+        <div class="reassure" id="familyReassure" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- SCREEN 8: COMMAND CENTER (operators) -->
+    <section class="screen" id="screen-command">
+      <div class="console">
+        <div class="eyebrow">Operator view</div>
+        <h1 class="screen-title">LifeLink Command Center</h1>
+        <p class="screen-sub">Every active case in the system, live — this is what a dispatcher sees, not a patient.</p>
+
+        <div class="live-case-grid" id="liveCaseGrid">
+          <div class="glass-card critical"><div class="gc-top"><span class="gc-dot"></span></div><div class="gc-val" id="lcCritical">—</div><div class="gc-lbl">🔴 Critical</div></div>
+          <div class="glass-card high"><div class="gc-top"><span class="gc-dot"></span></div><div class="gc-val" id="lcHigh">—</div><div class="gc-lbl">🟠 High</div></div>
+          <div class="glass-card stable"><div class="gc-top"><span class="gc-dot"></span></div><div class="gc-val" id="lcStable">—</div><div class="gc-lbl">🟢 Stable</div></div>
+        </div>
+
+        <div class="panel" style="margin-top:18px;">
+          <div class="panel-head">Active cases</div>
+          <div style="overflow-x:auto;">
+            <table class="cases-table" id="casesTable">
+              <thead><tr><th>Case</th><th>Risk</th><th>Location</th><th>Ambulance</th><th>Hospital</th><th>ETA</th><th>Status</th></tr></thead>
+              <tbody id="casesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 9: ANALYTICS -->
+    <section class="screen" id="screen-analytics">
+      <div class="console">
+        <div class="eyebrow">AnalyticsAgent</div>
+        <h1 class="screen-title">Analytics</h1>
+        <p class="screen-sub">Only metrics computed from real case data — nothing fabricated or randomized.</p>
+
+        <div class="kpi-row" id="kpiRow"></div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">Risk distribution — all cases</div>
+            <div class="risk-dist-bar" id="riskDistBar"></div>
+            <div class="risk-dist-legend" id="riskDistLegend"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">ICU occupancy by hospital (real hospital data)</div>
+            <div class="icu-row" id="icuRow"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
