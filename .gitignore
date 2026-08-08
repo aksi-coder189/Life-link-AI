@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# database
+*.db
+*.sqlite3
+lifelink.db
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# node (if any tooling is added later)
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# logs
+*.log
